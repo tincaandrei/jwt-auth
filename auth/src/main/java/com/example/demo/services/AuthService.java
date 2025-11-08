@@ -39,8 +39,8 @@ public class AuthService {
             throw new IllegalArgumentException("Email already exists");
         }
 
-        Role userRole = roleRepository.findByName(RoleName.ROLE_USER)
-                .orElseThrow(() -> new IllegalStateException("ROLE_USER not seeded"));
+        Role userRole = roleRepository.findByName(RoleName.ROLE_CLIENT)
+                .orElseThrow(() -> new IllegalStateException("ROLE_CLIENT not seeded"));
 
         User user = User.builder()
                 .username(request.getUsername())

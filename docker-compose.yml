@@ -1,8 +1,7 @@
-version: '3.9'
-
 services:
   traefik:
     image: traefik:v2.11
+    container_name: traefik
     command:
       - --providers.docker=true
       - --providers.docker.exposedbydefault=false
@@ -11,75 +10,105 @@ services:
       - "8080:80"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
+    depends_on:
+      db:
+        condition: service_healthy
     networks:
-      - gateway
+      - backend
 
-  auth-db:
+  db:
     image: postgres:16-alpine
+    container_name: postgres
     environment:
-      POSTGRES_USER: auth_user
-      POSTGRES_PASSWORD: auth_pwd
-      POSTGRES_DB: auth_db
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
     volumes:
-      - auth_data:/var/lib/postgresql/data
+      - db_data:/var/lib/postgresql/data
+      - ./docker/db/init.sql:/docker-entrypoint-initdb.d/init.sql:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 3s
+      retries: 5
+      start_period: 10s
     networks:
-      - gateway
+      - backend
 
   auth-service:
-    build: ./auth
-    depends_on:
-      - auth-db
+    build:
+      context: ./auth
+    container_name: auth-service
     environment:
-      DB_IP: auth-db
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: db
       DB_PORT: 5432
+      DB_NAME: auth_db
       DB_USER: auth_user
       DB_PASSWORD: auth_pwd
-      DB_DBNAME: auth_db
       PORT: 8080
       JWT_SECRET: ${JWT_SECRET:-change_this_super_secret_key_at_least_256_bits}
+    depends_on:
+      db:
+        condition: service_healthy
     labels:
       - traefik.enable=true
-      - traefik.http.routers.auth.rule=PathPrefix(`/auth`)
+      - traefik.http.routers.auth.rule=PathPrefix(`/api/auth`)
       - traefik.http.routers.auth.entrypoints=web
       - traefik.http.services.auth.loadbalancer.server.port=8080
     networks:
-      - gateway
-
-  user-db:
-    image: postgres:16-alpine
-    environment:
-      POSTGRES_USER: user_user
-      POSTGRES_PASSWORD: user_pwd
-      POSTGRES_DB: user_db
-    volumes:
-      - user_data:/var/lib/postgresql/data
-    networks:
-      - gateway
+      - backend
 
   user-service:
-    build: ./user
-    depends_on:
-      - user-db
+    build:
+      context: ./user
+    container_name: user-service
     environment:
-      DB_HOST: user-db
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: db
       DB_PORT: 5432
+      DB_NAME: user_db
       DB_USER: user_user
       DB_PASSWORD: user_pwd
-      DB_NAME: user_db
       PORT: 8081
       JWT_SECRET: ${JWT_SECRET:-change_this_super_secret_key_at_least_256_bits}
+    depends_on:
+      db:
+        condition: service_healthy
     labels:
       - traefik.enable=true
-      - traefik.http.routers.user.rule=PathPrefix(`/users`)
+      - traefik.http.routers.user.rule=PathPrefix(`/api/users`)
       - traefik.http.routers.user.entrypoints=web
       - traefik.http.services.user.loadbalancer.server.port=8081
     networks:
-      - gateway
+      - backend
+
+  device-service:
+    build:
+      context: ./device
+    container_name: device-service
+    environment:
+      SPRING_PROFILES_ACTIVE: docker
+      DB_HOST: db
+      DB_PORT: 5432
+      DB_NAME: devices_db
+      DB_USER: device_user
+      DB_PASSWORD: device_pwd
+      PORT: 8082
+      JWT_SECRET: ${JWT_SECRET:-change_this_super_secret_key_at_least_256_bits}
+    depends_on:
+      db:
+        condition: service_healthy
+    labels:
+      - traefik.enable=true
+      - traefik.http.routers.device.rule=PathPrefix(`/api/devices`)
+      - traefik.http.routers.device.entrypoints=web
+      - traefik.http.services.device.loadbalancer.server.port=8082
+    networks:
+      - backend
 
 networks:
-  gateway:
+  backend:
     driver: bridge
 
 volumes:
-  auth_data:
-  user_data:
+  db_data:
