@@ -1,85 +1,100 @@
-version: '3.9'
-
+version: "3.9"
 services:
   traefik:
-    image: traefik:v2.11
+    image: traefik:v3.0
     command:
-      - --providers.docker=true
-      - --providers.docker.exposedbydefault=false
-      - --entrypoints.web.address=:80
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--entrypoints.web.address=:80"
     ports:
-      - "8080:80"
+      - "80:80"
+      - "8080:8080"
     volumes:
       - /var/run/docker.sock:/var/run/docker.sock:ro
-    networks:
-      - gateway
+
+  auth-service:
+    build: ./auth-service
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://auth-db:5432/authdb
+      - SPRING_DATASOURCE_USERNAME=auth_user
+      - SPRING_DATASOURCE_PASSWORD=auth_pass
+      - JWT_SECRET=${JWT_SECRET:-dev_secret_change_me}
+      - JWT_ACCESS_TTL_SECONDS=900
+    depends_on:
+      - auth-db
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.auth.rule=PathPrefix(`/auth`)"
+      - "traefik.http.routers.auth.entrypoints=web"
+      - "traefik.http.services.auth.loadbalancer.server.port=8081"
+      - "traefik.http.middlewares.auth-strip.stripprefix.prefixes=/auth"
+      - "traefik.http.routers.auth.middlewares=auth-strip"
 
   auth-db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: auth_user
-      POSTGRES_PASSWORD: auth_pwd
-      POSTGRES_DB: auth_db
+      - POSTGRES_DB=authdb
+      - POSTGRES_USER=auth_user
+      - POSTGRES_PASSWORD=auth_pass
     volumes:
       - auth_data:/var/lib/postgresql/data
-    networks:
-      - gateway
 
-  auth-service:
-    build: ./auth
-    depends_on:
-      - auth-db
+  user-service:
+    build: ./user-service
     environment:
-      DB_IP: auth-db
-      DB_PORT: 5432
-      DB_USER: auth_user
-      DB_PASSWORD: auth_pwd
-      DB_DBNAME: auth_db
-      PORT: 8080
-      JWT_SECRET: ${JWT_SECRET:-change_this_super_secret_key_at_least_256_bits}
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://user-db:5432/userdb
+      - SPRING_DATASOURCE_USERNAME=user_service
+      - SPRING_DATASOURCE_PASSWORD=user_pass
+      - JWT_SECRET=${JWT_SECRET:-dev_secret_change_me}
+    depends_on:
+      - user-db
+      - traefik
     labels:
-      - traefik.enable=true
-      - traefik.http.routers.auth.rule=PathPrefix(`/auth`)
-      - traefik.http.routers.auth.entrypoints=web
-      - traefik.http.services.auth.loadbalancer.server.port=8080
-    networks:
-      - gateway
+      - "traefik.enable=true"
+      - "traefik.http.routers.users.rule=PathPrefix(`/users`)"
+      - "traefik.http.routers.users.entrypoints=web"
+      - "traefik.http.services.users.loadbalancer.server.port=8082"
+      - "traefik.http.middlewares.users-strip.stripprefix.prefixes=/users"
+      - "traefik.http.routers.users.middlewares=users-strip"
 
   user-db:
     image: postgres:16-alpine
     environment:
-      POSTGRES_USER: user_user
-      POSTGRES_PASSWORD: user_pwd
-      POSTGRES_DB: user_db
+      - POSTGRES_DB=userdb
+      - POSTGRES_USER=user_service
+      - POSTGRES_PASSWORD=user_pass
     volumes:
       - user_data:/var/lib/postgresql/data
-    networks:
-      - gateway
 
-  user-service:
-    build: ./user
-    depends_on:
-      - user-db
+  device-service:
+    build: ./device-service
     environment:
-      DB_HOST: user-db
-      DB_PORT: 5432
-      DB_USER: user_user
-      DB_PASSWORD: user_pwd
-      DB_NAME: user_db
-      PORT: 8081
-      JWT_SECRET: ${JWT_SECRET:-change_this_super_secret_key_at_least_256_bits}
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://device-db:5432/devicedb
+      - SPRING_DATASOURCE_USERNAME=device_service
+      - SPRING_DATASOURCE_PASSWORD=device_pass
+      - JWT_SECRET=${JWT_SECRET:-dev_secret_change_me}
+    depends_on:
+      - device-db
+      - traefik
     labels:
-      - traefik.enable=true
-      - traefik.http.routers.user.rule=PathPrefix(`/users`)
-      - traefik.http.routers.user.entrypoints=web
-      - traefik.http.services.user.loadbalancer.server.port=8081
-    networks:
-      - gateway
+      - "traefik.enable=true"
+      - "traefik.http.routers.devices.rule=PathPrefix(`/devices`)"
+      - "traefik.http.routers.devices.entrypoints=web"
+      - "traefik.http.services.devices.loadbalancer.server.port=8083"
+      - "traefik.http.middlewares.devices-strip.stripprefix.prefixes=/devices"
+      - "traefik.http.routers.devices.middlewares=devices-strip"
 
-networks:
-  gateway:
-    driver: bridge
+  device-db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=devicedb
+      - POSTGRES_USER=device_service
+      - POSTGRES_PASSWORD=device_pass
+    volumes:
+      - device_data:/var/lib/postgresql/data
 
 volumes:
   auth_data:
   user_data:
+  device_data:
