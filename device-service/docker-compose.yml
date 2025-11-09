@@ -1,0 +1,41 @@
+version: "3.9"
+services:
+  device-service:
+    build: .
+    container_name: device-service
+    environment:
+      - SPRING_DATASOURCE_URL=jdbc:postgresql://device-db:5432/devicedb
+      - SPRING_DATASOURCE_USERNAME=device_service
+      - SPRING_DATASOURCE_PASSWORD=device_pass
+      - JWT_SECRET=${JWT_SECRET:-dev_secret_change_me}
+    depends_on:
+      - device-db
+      - traefik
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.devices.rule=PathPrefix(`/devices`)"
+      - "traefik.http.routers.devices.entrypoints=web"
+      - "traefik.http.services.devices.loadbalancer.server.port=8083"
+      - "traefik.http.middlewares.devices-stripprefix.stripprefix.prefixes=/devices"
+      - "traefik.http.routers.devices.middlewares=devices-stripprefix"
+  device-db:
+    image: postgres:16-alpine
+    environment:
+      - POSTGRES_DB=devicedb
+      - POSTGRES_USER=device_service
+      - POSTGRES_PASSWORD=device_pass
+    volumes:
+      - device_data:/var/lib/postgresql/data
+  traefik:
+    image: traefik:v3.0
+    command:
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--entrypoints.web.address=:80"
+    ports:
+      - "80:80"
+      - "8080:8080"
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+volumes:
+  device_data:

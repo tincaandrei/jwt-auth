@@ -1,0 +1,8 @@
+#!/bin/sh
+MVN_CMD=mvn
+if command -v "$MVN_CMD" >/dev/null 2>&1; then
+  exec "$MVN_CMD" "$@"
+else
+  echo "Maven is required. Please install Maven or use the project Docker build." >&2
+  exit 1
+fi
