@@ -69,7 +69,7 @@ services:
       DB_NAME: user_db
       DB_USER: user_user
       DB_PASSWORD: user_pwd
-      PORT: 8081
+      PORT: 8080
       JWT_SECRET: ${JWT_SECRET:-change_this_super_secret_key_at_least_256_bits}
     depends_on:
       db:
@@ -78,7 +78,7 @@ services:
       - traefik.enable=true
       - traefik.http.routers.user.rule=PathPrefix(`/api/users`)
       - traefik.http.routers.user.entrypoints=web
-      - traefik.http.services.user.loadbalancer.server.port=8081
+      - traefik.http.services.user.loadbalancer.server.port=8080
     networks:
       - backend
 
@@ -93,7 +93,7 @@ services:
       DB_NAME: devices_db
       DB_USER: device_user
       DB_PASSWORD: device_pwd
-      PORT: 8082
+      PORT: 8080
       JWT_SECRET: ${JWT_SECRET:-change_this_super_secret_key_at_least_256_bits}
     depends_on:
       db:
@@ -102,7 +102,7 @@ services:
       - traefik.enable=true
       - traefik.http.routers.device.rule=PathPrefix(`/api/devices`)
       - traefik.http.routers.device.entrypoints=web
-      - traefik.http.services.device.loadbalancer.server.port=8082
+      - traefik.http.services.device.loadbalancer.server.port=8080
     networks:
       - backend
 
